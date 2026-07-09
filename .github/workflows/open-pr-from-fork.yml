@@ -1,0 +1,43 @@
+name: Open PR From Fork
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".trigger-pr/**"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  open:
+    if: github.repository != 'benr00t3d/bot-pr-base'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Commit change in fork
+        run: |
+          set -euo pipefail
+          branch="actions-bot-pr-${GITHUB_RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          printf 'run=%s\nrepo=%s\n' "$GITHUB_RUN_ID" "$GITHUB_REPOSITORY" > "poc-${GITHUB_RUN_ID}.txt"
+          git add .
+          git commit -m "Open PR from fork workflow"
+          git push origin "$branch"
+          echo "branch=$branch" >> "$GITHUB_ENV"
+
+      - name: Open PR against base
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh pr create \
+            --repo benr00t3d/bot-pr-base \
+            --head "${GITHUB_REPOSITORY_OWNER}:${branch}" \
+            --base main \
+            --title "Actions bot fork PR ${GITHUB_RUN_ID}" \
+            --body "Safe PoC PR opened from a fork workflow using only GITHUB_TOKEN."
